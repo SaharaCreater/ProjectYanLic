@@ -1,6 +1,6 @@
-# Файл с функциями для шифровки и дешифровки сообщений
 sp = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'
 sp1 = 'abcdefghijklmnopqrstuvwxyz'
+
 morse_sp_en = {
     'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.', 'G': '--.', 'H': '....',
     'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 'P': '.--.',
@@ -13,332 +13,160 @@ morse_sp_sym = {
     ')': '-.--.-', '&': '.-...', ':': '---...', ';': '-.-.-.', '/': '-..-.', '_': '..--.-', '=': '-...-',
     '+': '.-.-.', '-': '-....-', '$': '...-..-', '@': '.--.-.', ' ': '/', '\n': '\n'}
 morse_sp = {
-    'А': '.-',    'Б': '-...',  'В': '.--',   'Г': '--.',   'Д': '-..',
-    'Е': '.',     'Ж': '...-',  'З': '--..',  'И': '..',
-    'Й': '.---',  'К': '-.-',   'Л': '.-..',  'М': '--',    'Н': '-.',
-    'О': '---',   'П': '.--.',  'Р': '.-.',   'С': '...',   'Т': '-',
-    'У': '..-',   'Ф': '..-.',  'Х': '....',  'Ц': '-..-',  'Ч': '---.',
-    'Ш': '----',  'Щ': '--.-.',  'Ъ': '.--.-', 'Ы': '-.--',  'Ь': '-..-',
-    'Э': '..-..', 'Ю': '..--',  'Я': '.-.-'}
+    'А': '.-',   'Б': '-...', 'В': '.--',  'Г': '--.',  'Д': '-..',
+    'Е': '.',    'Ж': '...-', 'З': '--..', 'И': '..',
+    'Й': '.---', 'К': '-.-',  'Л': '.-..', 'М': '--',   'Н': '-.',
+    'О': '---',  'П': '.--.', 'Р': '.-.',  'С': '...',  'Т': '-',
+    'У': '..-',  'Ф': '..-.', 'Х': '....', 'Ц': '-..-', 'Ч': '---.',
+    'Ш': '----', 'Щ': '--.-.', 'Ъ': '.--.-', 'Ы': '-.--', 'Ь': '-..-',
+    'Э': '..-..', 'Ю': '..--', 'Я': '.-.-'}
 
-# Функция для шифра Атбаш
-def func_ashbat(text, name_file=None):
-    # Выполняется если не введено название файла
+_rev_morse_en  = {v: k for k, v in morse_sp_en.items()}
+_rev_morse_ru  = {v: k for k, v in morse_sp.items()}
+_rev_morse_sym = {v: k for k, v in morse_sp_sym.items()}
+
+_UNICODE_MOD = 0x110000
+
+def _apply(transformer, text=None, name_file=None, suffix=''):
+    """Если name_file — читаем, применяем, пишем. Иначе — применяем к text."""
     if not name_file:
-        res = ''
-        for i in text:
-            if i.lower() in sp:
-                if i.islower():
-                    res += sp[len(sp) - sp.find(i.lower()) - 1]
-                else:
-                    res += sp[len(sp) - sp.find(i.lower()) - 1].upper()
-            elif i.lower() in sp1:
-                if i.islower():
-                    res += sp1[len(sp1) - sp1.find(i.lower()) - 1]
-                else:
-                    res += sp1[len(sp1) - sp1.find(i.lower()) - 1].upper()
-            else:
-                res += i
-        return res
-    # Выполняется если введено название файла
-    else:
-        try:
-            with open(name_file, 'r', encoding='utf-8') as w:
-                f = open(f'{name_file}-Шифр Атбаш-output.txt', 'w', encoding='utf-8')
-                for i in w:
-                    for n in i:
-                        if n.lower() in sp:
-                            if n.islower():
-                                f.write(sp[len(sp) - sp.find(n.lower())])
-                            else:
-                                f.write(sp[len(sp) - sp.find(n.lower())].upper())
-                        elif n.lower() in sp1:
-                            if n.islower():
-                                f.write(sp1[len(sp1) - sp1.find(n.lower())])
-                            else:
-                                f.write(sp1[len(sp1) - sp1.find(n.lower())].upper())
-                        else:
-                            f.write(n)
-                f.close()
-            return 'OK'
-        # проверка на наличие файла
-        except FileNotFoundError:
-            return 'Error'
+        return transformer(text)
+    try:
+        with open(name_file, 'r', encoding='utf-8', newline='') as f:
+            content = f.read()
+    except FileNotFoundError:
+        return 'Error'
+    result = transformer(content)
+    with open(f'{name_file}-{suffix}-output.txt', 'w', encoding='utf-8', newline='') as f:
+        f.write(result)
+    return 'OK'
 
-# Функция для шифра Цезаря
+def _atbash(text):
+    out = []
+    for ch in text:
+        low = ch.lower()
+        if low in sp:
+            idx = 32 - sp.index(low)          # 32 = len(sp) - 1
+            out.append(sp[idx] if ch.islower() else sp[idx].upper())
+        elif low in sp1:
+            idx = 25 - sp1.index(low)         # 25 = len(sp1) - 1
+            out.append(sp1[idx] if ch.islower() else sp1[idx].upper())
+        else:
+            out.append(ch)
+    return ''.join(out)
+
+
+def func_ashbat(text, name_file=None):
+    return _apply(_atbash, text, name_file, 'Шифр Атбаш')
+
+
+def _caesar(text, shift):
+    out = []
+    for ch in text:
+        low = ch.lower()
+        if low in sp:
+            idx = (sp.index(low) + shift) % 33
+            out.append(sp[idx] if ch.islower() else sp[idx].upper())
+        elif low in sp1:
+            idx = (sp1.index(low) + shift) % 26
+            out.append(sp1[idx] if ch.islower() else sp1[idx].upper())
+        else:
+            out.append(ch)
+    return ''.join(out)
+
+
 def func_zesar(text, key, do, name_file=None):
     try:
-        if key == '':
-            key = 0
-        else:
-            key = int(key)
-        if do == 'Расшифровать':
-            key = -key
-        # Выполняется если не введено название файла
-        if not name_file:
-            res = ''
-            for i in text:
-                if i.lower() in sp:
-                    if i.islower():
-                        res += sp[(sp.find(i.lower()) + key) % 33]
-                    else:
-                        res += sp[(sp.find(i.lower()) + key) % 33].upper()
-                elif i.lower() in sp1:
-                    if i.islower():
-                        res += sp1[(sp1.find(i.lower()) + key) % 26]
-                    else:
-                        res += sp1[(sp1.find(i.lower()) + key) % 26].upper()
-                else:
-                    res += i
-            return res
-        # Выполняется если введено название файла
-        else:
-            try:
-                with open(name_file, 'r', encoding='utf-8') as w:
-                    f = open(f'{name_file}-Шифр Цезаря-output.txt', 'w', encoding='utf-8')
-                    for n in w:
-                        for i in n:
-                            if i.lower() in sp:
-                                if i.islower():
-                                    f.write(sp[(sp.find(i.lower()) + key) % 33])
-                                else:
-                                    f.write(sp[(sp.find(i.lower()) + key) % 33].upper())
-                            elif i.lower() in sp1:
-                                if i.islower():
-                                    f.write(sp1[(sp1.find(i.lower()) + key) % 26])
-                                else:
-                                    f.write(sp1[(sp1.find(i.lower()) + key) % 26].upper())
-                            else:
-                                f.write(i)
-                    f.close()
-                return 'OK'
-            # проверка на наличие файла
-            except FileNotFoundError:
-                return 'Error'
-    # проверка на корректность введеного ключа
+        shift = int(key) if key != '' else 0
     except ValueError:
         return 'Error'
+    if do == 'Расшифровать':
+        shift = -shift
+    return _apply(lambda t: _caesar(t, shift), text, name_file, 'Шифр Цезаря')
 
-# Функция для азбуки Морзе
+
+def _morse_encode(text, key):
+    table = morse_sp if key == 'RU' else morse_sp_en
+    tokens = []
+    for ch in text:
+        up = ch.upper()
+        if up in table:
+            tokens.append(table[up])
+        elif ch in morse_sp_sym:
+            tokens.append(morse_sp_sym[ch])
+    return ' '.join(tokens)
+
+
+def _morse_decode(text, key):
+    rev = _rev_morse_ru if key == 'RU' else _rev_morse_en
+    chars = []
+    for token in text.split(' '):
+        if not token:
+            continue
+        if token in rev:
+            chars.append(rev[token].lower())
+        elif token in _rev_morse_sym:
+            chars.append(_rev_morse_sym[token].lower())
+    return ''.join(chars)
+
+
 def func_morse(text, do, key, name_file=None):
-    try:
-        if key == 'RU' or key == 'EN':
-            # Выполняется если не введено название файла
-            if not name_file:
-                res = []
-                res1 = ''
-                if do == 'Зашифровать':
-                    text = text.upper()
-                    for i in text:
-                        if key == 'RU':
-                            if i in morse_sp:
-                                res.append(morse_sp[i])
-                            elif i in morse_sp_sym:
-                                res.append(morse_sp_sym[i])
-                        elif key == 'EN':
-                            if i in morse_sp_en:
-                                res.append(morse_sp_en[i])
-                            elif i in morse_sp_sym:
-                                res.append(morse_sp_sym[i])
-                    return ' '.join(res)
-                else:
-                    reverse_morse_en = {v: k for k, v in morse_sp_en.items()}
-                    reverse_morse = {v: k for k, v in morse_sp.items()}
-                    reverse_morse_sym = {v: k for k, v in morse_sp_sym.items()}
-                    for i in text.split(' '):
-                        if key == 'RU':
-                            if i in reverse_morse:
-                                res1 += (reverse_morse[i]).lower()
-                            elif i in reverse_morse_sym:
-                                res1 += (reverse_morse_sym[i]).lower()
-                        elif key == 'EN':
-                            if i in reverse_morse_en:
-                                res1 += (reverse_morse_en[i]).lower()
-                            elif i in reverse_morse_sym:
-                                res1 += (reverse_morse_sym[i]).lower()
-                    return res1
-            # Выполняется если введено название файла
-            else:
-                try:
-                    sp = []
-                    with open(name_file, 'r', encoding='utf-8') as w:
-                        f = open(f'{name_file}-Азбука Морзе-output.txt', 'w', encoding='utf-8')
-                        if do == 'Зашифровать':
-                            if key == 'RU':
-                                for n in w:
-                                    for i in n:
-                                        i = i.upper()
-                                        if i in morse_sp:
-                                            sp.append(morse_sp[i])
-                                        elif i in morse_sp_sym:
-                                            sp.append(morse_sp_sym[i])
-                                    f.write(' '.join(sp))
-                                    sp = []
-                            elif key == 'EN':
-                                for n in w:
-                                    for i in n:
-                                        i = i.upper()
-                                        if i in morse_sp_en:
-                                            sp.append(morse_sp_en[i])
-                                        elif i in morse_sp_sym:
-                                            sp.append(morse_sp_sym[i])
-                                    f.write(' '.join(sp))
-                                    sp = []
-                        else:
-                            reverse_morse_en = {v: k for k, v in morse_sp_en.items()}
-                            reverse_morse = {v: k for k, v in morse_sp.items()}
-                            reverse_morse_sym = {v: k for k, v in morse_sp_sym.items()}
-                            if key == 'RU':
-                                for n in w:
-                                    for i in n.split():
-                                        if i in reverse_morse:
-                                            f.write(reverse_morse[i].lower())
-                                        elif i in reverse_morse_sym:
-                                            f.write(reverse_morse_sym[i].lower())
-                                    f.write('\n')
-                            elif key == 'EN':
-                                for n in w:
-                                    for i in n.split():
-                                        if i in reverse_morse_en:
-                                            f.write(reverse_morse_en[i].lower())
-                                        elif i in reverse_morse_sym:
-                                            f.write(reverse_morse_sym[i].lower())
-                                    f.write('\n')
-                        f.close()
-                    return 'OK'
-                # проверка на наличие файла
-                except FileNotFoundError:
-                    return 'Error'
-        else:
-            raise ValueError
-    # проверка на корректность введеного ключа
-    except ValueError:
+    if key not in ('RU', 'EN'):
         return 'Error'
+    fn = (lambda t: _morse_encode(t, key)) if do == 'Зашифровать' \
+         else (lambda t: _morse_decode(t, key))
+    return _apply(fn, text, name_file, 'Азбука Морзе')
 
-# Функция для шифра Виженера
+
+def _vizenera(text, do, key):
+    key_lower = key.lower()
+    if not key_lower:
+        raise ValueError('empty key')
+    sign = 1 if do == 'Зашифровать' else -1
+    out = []
+    pos = 0
+    for ch in text:
+        low = ch.lower()
+        if low in sp:
+            k = key_lower[pos % len(key_lower)]
+            if k not in sp:
+                raise ValueError('key alphabet mismatch')
+            idx = (sp.index(low) + sign * sp.index(k)) % 33
+            out.append(sp[idx] if ch.islower() else sp[idx].upper())
+            pos += 1
+        elif low in sp1:
+            k = key_lower[pos % len(key_lower)]
+            if k not in sp1:
+                raise ValueError('key alphabet mismatch')
+            idx = (sp1.index(low) + sign * sp1.index(k)) % 26
+            out.append(sp1[idx] if ch.islower() else sp1[idx].upper())
+            pos += 1
+        else:
+            out.append(ch)
+    return ''.join(out)
+
+
 def func_vizenera(text, do, key, name_file=None):
     try:
-        p = len(key)
-        if not p:
-            raise ValueError
-        res = ''
-        # Выполняется если не введено название файла
-        if not name_file:
-            if do == 'Зашифровать':
-                for i in range(len(text)):
-                    if text[i].lower() in sp:
-                        if text[i].islower():
-                            res += sp[(sp.index(text[i].lower()) + sp.index(key[i % p].lower())) % 33]
-                        else:
-                            res += sp[(sp.index(text[i].lower()) + sp.index(key[i % p].lower())) % 33].upper()
-                    elif text[i] in sp1:
-                        if text[i].islower():
-                            res += sp1[(sp1.index(text[i].lower()) + sp1.index(key[i % p].lower())) % 26]
-                        else:
-                            res += sp1[(sp1.index(text[i].lower()) + sp1.index(key[i % p].lower())) % 26]
-                    else:
-                        res += text[i]
-            else:
-                for i in range(len(text)):
-                    if text[i].lower() in sp:
-                        if text[i].islower():
-                            res += sp[(sp.index(text[i].lower()) - sp.index(key[i % p].lower())) % 33]
-                        else:
-                            res += sp[(sp.index(text[i].lower()) - sp.index(key[i % p].lower())) % 33].upper()
-                    elif text[i] in sp1:
-                        if text[i].islower():
-                            res += sp1[(sp1.index(text[i].lower()) - sp1.index(key[i % p].lower())) % 26]
-                        else:
-                            res += sp1[(sp1.index(text[i].lower()) - sp1.index(key[i % p].lower())) % 26]
-                    else:
-                        res += text[i]
-            return res
-        # Выполняется если введено название файла
-        else:
-            try:
-                with open(name_file, 'r', encoding='utf-8') as w:
-                    f = open(f'{name_file}-Шифр Вернама-output.txt', 'w', encoding='utf-8')
-                    if do == 'Зашифровать':
-                        for n in w:
-                            for i in range(len(n)):
-                                if n[i].lower() in sp:
-                                    if n[i].islower():
-                                        f.write(sp[(sp.index(n[i].lower()) + sp.index(key[i % p].lower())) % 33])
-                                    else:
-                                        f.write(sp[(sp.index(n[i].lower()) +
-                                                    sp.index(key[i % p].lower())) % 33].upper())
-                                elif n[i] in sp1:
-                                    if n[i].islower():
-                                        f.write(sp1[(sp1.index(n[i].lower()) + sp1.index(key[i % p].lower())) % 26])
-                                    else:
-                                        f.write(sp1[(sp1.index(n[i].lower()) + sp1.index(key[i % p].lower())) % 26])
-                                else:
-                                    f.write(n[i])
-                    else:
-                        for n in w:
-                            for i in range(len(n)):
-                                if n[i].lower() in sp:
-                                    if n[i].islower():
-                                        f.write(sp[(sp.index(n[i].lower()) - sp.index(key[i % p].lower())) % 33])
-                                    else:
-                                        f.write(sp[(sp.index(n[i].lower()) -
-                                                    sp.index(key[i % p].lower())) % 33].upper())
-                                elif n[i] in sp1:
-                                    if n[i].islower():
-                                        f.write(sp1[(sp1.index(n[i].lower()) - sp1.index(key[i % p].lower())) % 26])
-                                    else:
-                                        f.write(sp1[(sp1.index(n[i].lower()) - sp1.index(key[i % p].lower())) % 26])
-                                else:
-                                    f.write(n[i])
-                        f.close()
-                    return 'OK'
-            # проверка на наличие файла
-            except FileNotFoundError:
-                return 'Error'
-    # проверка на корректность введеного ключа
+        return _apply(lambda t: _vizenera(t, do, key), text, name_file, 'Шифр Виженера')
     except ValueError:
         return 'Error'
 
-# Функция для шифра Вернама
+
+def _vernam(text, do, key):
+    if not key:
+        raise ValueError('empty key')
+    key_int = [ord(c) for c in key]
+    sign = 1 if do == 'Зашифровать' else -1
+    out = []
+    for i, ch in enumerate(text):
+        v = (ord(ch) + sign * key_int[i % len(key_int)]) % _UNICODE_MOD
+        out.append(chr(v))
+    return ''.join(out)
+
+
 def func_vernama(text, do, key, name_file=None):
     try:
-        key_len = len(key)
-        if not key_len:
-            raise ValueError
-        key_int = [ord(i) for i in key]
-        # Выполняется если не введено название файла
-        if not name_file:
-            res = []
-            text_int = [ord(i) for i in text]
-            if do == 'Зашифровать':
-                for i in range(len(text_int)):
-                    value = (text_int[i] + key_int[i % key_len]) % 1114112
-                    res.append(chr(value))
-                return ''.join(res)
-            else:
-                for i in range(len(text)):
-                    value = (text_int[i] - key_int[i % key_len]) % 1114112
-                    res.append(chr(value))
-                return ''.join(res)
-        # Выполняется если введено название файла
-        else:
-            try:
-                with open(name_file, 'r', encoding='utf-8') as w:
-                    f = open(f'{name_file}-Шифр Виженера-output.txt', 'w', encoding='utf-8')
-                    text_int = [ord(i) for i in w.read()]
-                    if do == 'Зашифровать':
-                        for i in range(len(text_int)):
-                            value = (text_int[i] + key_int[i % key_len]) % 1114112
-                            f.write(chr(value))
-                    else:
-                        for i in range(len(text_int)):
-                            value = (text_int[i] - key_int[i % key_len]) % 1114112
-                            f.write(chr(value))
-                    f.close()
-                return 'OK'
-            # проверка на наличие файла
-            except FileNotFoundError:
-                return 'Error'
+        return _apply(lambda t: _vernam(t, do, key), text, name_file, 'Шифр Вернама')
     except ValueError:
         return 'Error'
-
